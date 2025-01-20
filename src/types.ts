@@ -141,6 +141,8 @@ export interface IOptions extends IWsdlBaseOptions {
   WSDL_CACHE?;
   /** handle MTOM soapAttachments in response */
   parseReponseAttachments?: boolean;
+  /** custom function to load WSDL from uri */
+  loadWsdl?: (uri: string) => Promise<string>;
 }
 
 export interface IOneWayOptions {

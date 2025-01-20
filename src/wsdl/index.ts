@@ -1394,6 +1394,24 @@ function open_wsdl_recursive(uri: any, p2: WSDLCallback | IOptions, p3?: WSDLCal
   return open_wsdl(uri, options, callback);
 }
 
+function load_wsdl(uri: string, options: IOptions, callback: (err: any, xml?: string) => void) {
+  if (options.loadWsdl) {
+    options.loadWsdl(uri).then((body) => callback(null, body), (err) => callback(err));
+    return;
+  }
+
+  const httpClient = options.httpClient || new HttpClient(options);
+  httpClient.request(uri, null /* options */, (err, response, body) => {
+    if (err) {
+      callback(err);
+    } else if (response && response.status === 200) {
+      callback(null, body);
+    } else {
+      callback(new Error('Invalid WSDL URL: ' + uri + '\n\n\r Code: ' + response.status + '\n\n\r Response Body: ' + response.data));
+    }
+  }, options.wsdl_headers, options.wsdl_options);
+}
+
 export function open_wsdl(uri: any, callback: WSDLCallback);
 export function open_wsdl(uri: any, options: IOptions, callback: WSDLCallback);
 export function open_wsdl(uri: any, p2: WSDLCallback | IOptions, p3?: WSDLCallback) {
@@ -1409,8 +1427,6 @@ export function open_wsdl(uri: any, p2: WSDLCallback | IOptions, p3?: WSDLCallba
 
   // initialize cache when calling open_wsdl directly
   const WSDL_CACHE = options.WSDL_CACHE || {};
-  const request_headers = options.wsdl_headers;
-  const request_options = options.wsdl_options;
 
   let wsdl: WSDL;
   if (/^\<\?xml[^>]*?>/i.test(uri)) {
@@ -1432,19 +1448,16 @@ export function open_wsdl(uri: any, p2: WSDLCallback | IOptions, p3?: WSDLCallba
     });
   } else {
     debug('Reading url: %s', uri);
-    const httpClient = options.httpClient || new HttpClient(options);
-    httpClient.request(uri, null /* options */, (err, response, definition) => {
+    load_wsdl(uri, options, (err, definition) => {
       if (err) {
         callback(err);
-      } else if (response && response.status === 200) {
+      } else {
         wsdl = new WSDL(definition, uri, options);
         WSDL_CACHE[uri] = wsdl;
         wsdl.WSDL_CACHE = WSDL_CACHE;
         wsdl.onReady(callback);
-      } else {
-        callback(new Error('Invalid WSDL URL: ' + uri + '\n\n\r Code: ' + response.status + '\n\n\r Response Body: ' + response.data));
       }
-    }, request_headers, request_options);
+    });
   }
 
   return wsdl;
